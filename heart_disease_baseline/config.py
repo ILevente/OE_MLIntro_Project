@@ -37,6 +37,8 @@ NUMERIC_COLUMNS = [
 
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
+CV_FOLDS = 5
+TUNING_REFIT_METRIC = "recall"
 
 # Heart disease screening should prioritize catching positive cases.
 # The best model is therefore selected by minimizing false negatives first,
