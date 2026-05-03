@@ -116,7 +116,7 @@ Created output files:
 - [artifacts/tuned_selection_summary.json](./artifacts/tuned_selection_summary.json)
 - [artifacts/tuned_cv_results.json](./artifacts/tuned_cv_results.json)
 - [artifacts/tuned_best_model.joblib](./artifacts/tuned_best_model.joblib)
-- [artifacts/tuned_overfitting_summary.csv](./artifacts/tuned_overfitting_summary.csv)
+- [artifacts/tuned_train_vs_test_gap_summary.csv](./artifacts/tuned_train_vs_test_gap_summary.csv)
 
 Created figures:
 
@@ -131,17 +131,17 @@ Created figures:
 - [artifacts/figures/confusion_matrix_svm.png](./artifacts/figures/confusion_matrix_svm.png)
 - [artifacts/figures/baseline_vs_tuned_comparison.png](./artifacts/figures/baseline_vs_tuned_comparison.png)
 - [artifacts/figures/tuned_model_recall_scores.png](./artifacts/figures/tuned_model_recall_scores.png)
-- [artifacts/figures/tuned_train_vs_test_recall.png](./artifacts/figures/tuned_train_vs_test_recall.png)
+- [artifacts/figures/tuned_refit_train_vs_test_recall.png](./artifacts/figures/tuned_refit_train_vs_test_recall.png)
 - [artifacts/figures/tuned_confusion_matrix_logistic_regression.png](./artifacts/figures/tuned_confusion_matrix_logistic_regression.png)
 - [artifacts/figures/tuned_confusion_matrix_decision_tree.png](./artifacts/figures/tuned_confusion_matrix_decision_tree.png)
 - [artifacts/figures/tuned_confusion_matrix_random_forest.png](./artifacts/figures/tuned_confusion_matrix_random_forest.png)
 - [artifacts/figures/tuned_confusion_matrix_knn.png](./artifacts/figures/tuned_confusion_matrix_knn.png)
 - [artifacts/figures/tuned_confusion_matrix_svm.png](./artifacts/figures/tuned_confusion_matrix_svm.png)
-- [artifacts/figures/tuned_overfitting_logistic_regression.png](./artifacts/figures/tuned_overfitting_logistic_regression.png)
-- [artifacts/figures/tuned_overfitting_decision_tree.png](./artifacts/figures/tuned_overfitting_decision_tree.png)
-- [artifacts/figures/tuned_overfitting_random_forest.png](./artifacts/figures/tuned_overfitting_random_forest.png)
-- [artifacts/figures/tuned_overfitting_knn.png](./artifacts/figures/tuned_overfitting_knn.png)
-- [artifacts/figures/tuned_overfitting_svm.png](./artifacts/figures/tuned_overfitting_svm.png)
+- [artifacts/figures/tuned_cv_complexity_logistic_regression.png](./artifacts/figures/tuned_cv_complexity_logistic_regression.png)
+- [artifacts/figures/tuned_cv_complexity_decision_tree.png](./artifacts/figures/tuned_cv_complexity_decision_tree.png)
+- [artifacts/figures/tuned_cv_complexity_random_forest.png](./artifacts/figures/tuned_cv_complexity_random_forest.png)
+- [artifacts/figures/tuned_cv_complexity_knn.png](./artifacts/figures/tuned_cv_complexity_knn.png)
+- [artifacts/figures/tuned_cv_complexity_svm.png](./artifacts/figures/tuned_cv_complexity_svm.png)
 
 ## 7. Current baseline results
 
@@ -187,11 +187,11 @@ Best hyperparameters found during cross-validation:
 
 The tuned workflow also exports explicit fit diagnostics:
 
-- [artifacts/tuned_overfitting_summary.csv](./artifacts/tuned_overfitting_summary.csv), which compares train and test accuracy/recall for each tuned model
-- [artifacts/figures/tuned_train_vs_test_recall.png](./artifacts/figures/tuned_train_vs_test_recall.png), a summary figure for train-vs-test recall gaps
-- one per-model complexity plot showing train-vs-validation metric curves against a primary complexity parameter
+- [artifacts/tuned_train_vs_test_gap_summary.csv](./artifacts/tuned_train_vs_test_gap_summary.csv), which compares final refit train and test accuracy/recall for each tuned model
+- [artifacts/figures/tuned_refit_train_vs_test_recall.png](./artifacts/figures/tuned_refit_train_vs_test_recall.png), a summary figure for final refit train-vs-test recall gaps
+- one per-model cross-validated complexity plot showing the best GridSearchCV result found at each primary complexity value
 
-Those validation curves are sampled on a denser plotting grid while the tuned model selection itself still uses the original `GridSearchCV` search spaces. This improves the plots without changing the chosen tuned model.
+Those per-model complexity plots now reflect the actual `GridSearchCV` search space on the primary parameter rather than a separate post-hoc sweep.
 
 Current train-vs-test accuracy gaps for the tuned models:
 

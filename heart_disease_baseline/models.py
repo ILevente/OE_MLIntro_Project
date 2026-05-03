@@ -91,7 +91,7 @@ def build_tuning_registry() -> dict[str, dict[str, object]]:
             "param_grid": {
                 # Tune regularization strength and solver choice for the linear baseline.
                 # The `model__` prefix targets the named pipeline step above.
-                "model__C": [0.1, 1.0, 10.0],
+                "model__C": [0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0],
                 "model__class_weight": [None, "balanced"],
                 "model__solver": ["lbfgs", "liblinear"],
             },
@@ -105,7 +105,7 @@ def build_tuning_registry() -> dict[str, dict[str, object]]:
                 + [("model", DecisionTreeClassifier(random_state=RANDOM_STATE))]
             ),
             "param_grid": {
-                "model__max_depth": [3, 5, 7, None],
+                "model__max_depth": [2, 3, 4, 5, 6, 7, 8, None],
                 "model__class_weight": [None, "balanced"],
                 "model__min_samples_leaf": [1, 2, 4],
             },
@@ -123,7 +123,7 @@ def build_tuning_registry() -> dict[str, dict[str, object]]:
                 "model__class_weight": [None, "balanced"],
                 "model__n_estimators": [200, 300],
                 "model__max_depth": [None, 8, 12],
-                "model__min_samples_leaf": [2, 3, 4],
+                "model__min_samples_leaf": [2, 3, 4, 5, 6],
             },
             "primary_complexity_param": "model__min_samples_leaf",
             "primary_complexity_label": "Min Samples Leaf",
@@ -136,7 +136,7 @@ def build_tuning_registry() -> dict[str, dict[str, object]]:
             "param_grid": {
                 # KNN tuning focuses on neighborhood size, weighting, and distance metric.
                 # `p=1` means Manhattan distance, while `p=2` means Euclidean distance.
-                "model__n_neighbors": [5, 11, 21],
+                "model__n_neighbors": [3, 5, 7, 11, 15, 21, 31],
                 "model__weights": ["uniform", "distance"],
                 "model__p": [1, 2],
             },
@@ -152,7 +152,7 @@ def build_tuning_registry() -> dict[str, dict[str, object]]:
             "param_grid": {
                 # For the RBF SVM, C and gamma control the margin and kernel shape.
                 # These also use the `model__` prefix because the classifier sits inside a pipeline.
-                "model__C": [0.5, 1.0, 2.0],
+                "model__C": [0.25, 0.5, 1.0, 2.0, 4.0],
                 "model__class_weight": [None, "balanced"],
                 "model__gamma": ["scale", "auto"],
             },

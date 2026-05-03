@@ -109,8 +109,11 @@ def save_tuning_results(tuning_results: Mapping[str, dict[str, object]]) -> None
     )
 
 
-def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mapping[str, dict[str, object]]) -> None:
-    """Save train-vs-test gap summaries and model-complexity diagnostics for tuned models."""
+def save_tuned_diagnostics_outputs(
+    tuned_metrics: pd.DataFrame,
+    tuning_results: Mapping[str, dict[str, object]],
+) -> None:
+    """Save final refit gap diagnostics and cross-validated complexity diagnostics."""
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +133,7 @@ def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mappin
             "recall": "test_recall",
         }
     )
-    gap_summary.to_csv(ARTIFACTS_DIR / "tuned_overfitting_summary.csv", index=False)
+    gap_summary.to_csv(ARTIFACTS_DIR / "tuned_train_vs_test_gap_summary.csv", index=False)
 
     recall_plot_data = tuned_metrics[["model", "train_recall", "recall"]].melt(
         id_vars="model",
@@ -154,11 +157,11 @@ def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mappin
         orient="h",
     )
     annotate_horizontal_bars(ax, fmt="%.3f")
-    plt.title("Tuned Models: Train vs Test Recall")
+    plt.title("Tuned Models: Final Refit Train vs Test Recall")
     plt.xlabel("Recall")
     plt.ylabel("Model")
     plt.tight_layout()
-    plt.savefig(FIGURES_DIR / "tuned_train_vs_test_recall.png", dpi=200)
+    plt.savefig(FIGURES_DIR / "tuned_refit_train_vs_test_recall.png", dpi=200)
     plt.close()
 
     for model_name, result in tuning_results.items():
@@ -198,7 +201,7 @@ def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mappin
                 dashes=False,
                 ax=ax,
             )
-            ax.set_title(f"{model_name} {metric_label} vs Complexity")
+            ax.set_title(f"{model_name} {metric_label} vs CV Search Complexity")
             ax.set_xlabel(primary_label)
             ax.set_ylabel(metric_label)
             ax.tick_params(axis="x", rotation=20)
@@ -209,10 +212,10 @@ def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mappin
         if axes[1].get_legend() is not None:
             axes[1].get_legend().remove()
         fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
-        fig.suptitle(f"{model_name} Overfitting Diagnostic", y=0.98)
+        fig.suptitle(f"{model_name} Cross-Validated Complexity Diagnostic", y=0.98)
         plt.tight_layout(rect=(0, 0.06, 1, 0.95))
         safe_name = model_name.lower().replace(" ", "_")
-        plt.savefig(FIGURES_DIR / f"tuned_overfitting_{safe_name}.png", dpi=200)
+        plt.savefig(FIGURES_DIR / f"tuned_cv_complexity_{safe_name}.png", dpi=200)
         plt.close()
 
 

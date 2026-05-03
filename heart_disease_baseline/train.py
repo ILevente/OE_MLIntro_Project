@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import pandas as pd
-from sklearn.base import clone
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, validation_curve
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 
 from heart_disease_baseline.config import (
     CV_FOLDS,
@@ -18,52 +17,41 @@ from heart_disease_baseline.models import build_model_registry, build_tuning_reg
 from heart_disease_baseline.reporting import (
     save_comparison_outputs,
     save_experiment_outputs,
-    save_overfitting_outputs,
+    save_tuned_diagnostics_outputs,
     save_tuning_results,
 )
 
 
-def build_validation_curve(
-    estimator: object,
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    cv: StratifiedKFold,
+def build_complexity_profile(
+    search: GridSearchCV,
     primary_param: str,
     primary_label: str,
     ordered_values: list[object],
 ) -> tuple[str, str, list[dict[str, float | str | int | None]]]:
-    """Build a denser validation curve for one model while keeping other params fixed."""
-    train_accuracy_scores, validation_accuracy_scores = validation_curve(
-        estimator=clone(estimator),
-        X=X_train,
-        y=y_train,
-        param_name=primary_param,
-        param_range=ordered_values,
-        scoring="accuracy",
-        cv=cv,
-        n_jobs=-1,
-    )
-    train_recall_scores, validation_recall_scores = validation_curve(
-        estimator=clone(estimator),
-        X=X_train,
-        y=y_train,
-        param_name=primary_param,
-        param_range=ordered_values,
-        scoring="recall",
-        cv=cv,
-        n_jobs=-1,
-    )
+    """Profile actual GridSearchCV results by primary parameter value."""
+    results_frame = pd.DataFrame(search.cv_results_)
+    param_column = f"param_{primary_param}"
     rows: list[dict[str, float | str | int | None]] = []
 
-    for index, value in enumerate(ordered_values):
+    for value in ordered_values:
+        matching_rows = results_frame[results_frame[param_column].astype(str) == str(value)]
+        if matching_rows.empty:
+            continue
+
+        # For each primary value, keep the same kind of candidate GridSearchCV would prefer:
+        # the row with the strongest validation recall, breaking ties by F1 then accuracy.
+        selected_row = matching_rows.sort_values(
+            by=["mean_test_recall", "mean_test_f1", "mean_test_accuracy"],
+            ascending=[False, False, False],
+        ).iloc[0]
         rows.append(
             {
                 "complexity_value": value,
                 "complexity_value_label": str(value),
-                "mean_train_accuracy": float(train_accuracy_scores[index].mean()),
-                "mean_validation_accuracy": float(validation_accuracy_scores[index].mean()),
-                "mean_train_recall": float(train_recall_scores[index].mean()),
-                "mean_validation_recall": float(validation_recall_scores[index].mean()),
+                "mean_train_accuracy": float(selected_row["mean_train_accuracy"]),
+                "mean_validation_accuracy": float(selected_row["mean_test_accuracy"]),
+                "mean_train_recall": float(selected_row["mean_train_recall"]),
+                "mean_validation_recall": float(selected_row["mean_test_recall"]),
             }
         )
 
@@ -196,11 +184,8 @@ def run_tuned_experiment(
         predictions = best_model.predict(X_test)
         metrics_row, matrix = evaluate_predictions(model_name, y_test, predictions)
         train_metrics, _ = evaluate_predictions(model_name, y_train, train_predictions)
-        primary_param, primary_label, complexity_curve = build_validation_curve(
-            best_model,
-            X_train,
-            y_train,
-            cv,
+        primary_param, primary_label, complexity_curve = build_complexity_profile(
+            search,
             primary_param,
             primary_label,
             curve_values,
@@ -248,7 +233,7 @@ def run_tuned_experiment(
     )
     # Store the chosen hyperparameters and fold-averaged scores separately from the final test metrics.
     save_tuning_results(tuning_results)
-    save_overfitting_outputs(metrics, tuning_results)
+    save_tuned_diagnostics_outputs(metrics, tuning_results)
 
     return metrics
 
