@@ -1,23 +1,27 @@
 """Reads the CSV dataset, splits features and target, and builds summary statistics."""
 
 from __future__ import annotations
+
 from typing import Any
-from heart_disease_baseline.config import DATA_FILE, FEATURE_COLUMNS, TARGET_COLUMN
+
 import pandas as pd
+
+from heart_disease_baseline.config import DATA_FILE, FEATURE_COLUMNS, TARGET_COLUMN
 
 EXPECTED_COLUMNS = FEATURE_COLUMNS + [TARGET_COLUMN]
 
 
 def load_dataset(path=DATA_FILE) -> pd.DataFrame:
+    """Load the dataset and validate that the expected baseline schema is present."""
     dataframe = pd.read_csv(path)
-    # missing_columns = [column for column in EXPECTED_COLUMNS if column not in dataframe.columns]
-    # if missing_columns:
-    #     raise ValueError(f"Dataset is missing expected columns: {missing_columns}")
+    missing_columns = [column for column in EXPECTED_COLUMNS if column not in dataframe.columns]
+    if missing_columns:
+        raise ValueError(f"Dataset is missing expected columns: {missing_columns}")
 
-    # dataframe = dataframe[EXPECTED_COLUMNS].copy()
+    dataframe = dataframe[EXPECTED_COLUMNS].copy()
 
-    # if dataframe[TARGET_COLUMN].nunique() != 2:
-    #     raise ValueError("The target column must be binary for this baseline.")
+    if dataframe[TARGET_COLUMN].nunique() != 2:
+        raise ValueError("The target column must be binary for this baseline.")
 
     return dataframe
 
@@ -29,6 +33,7 @@ def split_features_target(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, pd.Ser
 
 
 def build_dataset_summary(dataframe: pd.DataFrame) -> dict[str, Any]:
+    """Summarize the raw dataset used for EDA and baseline reporting."""
     class_balance = dataframe[TARGET_COLUMN].value_counts().sort_index().to_dict()
     missing_values = dataframe.isna().sum().to_dict()
 

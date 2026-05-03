@@ -109,6 +109,113 @@ def save_tuning_results(tuning_results: Mapping[str, dict[str, object]]) -> None
     )
 
 
+def save_overfitting_outputs(tuned_metrics: pd.DataFrame, tuning_results: Mapping[str, dict[str, object]]) -> None:
+    """Save train-vs-test gap summaries and model-complexity diagnostics for tuned models."""
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    gap_columns = [
+        "model",
+        "train_accuracy",
+        "accuracy",
+        "accuracy_gap",
+        "train_recall",
+        "recall",
+        "recall_gap",
+    ]
+    gap_summary = tuned_metrics[gap_columns].copy()
+    gap_summary = gap_summary.rename(
+        columns={
+            "accuracy": "test_accuracy",
+            "recall": "test_recall",
+        }
+    )
+    gap_summary.to_csv(ARTIFACTS_DIR / "tuned_overfitting_summary.csv", index=False)
+
+    recall_plot_data = tuned_metrics[["model", "train_recall", "recall"]].melt(
+        id_vars="model",
+        var_name="split",
+        value_name="score",
+    )
+    recall_plot_data["split"] = recall_plot_data["split"].map(
+        {
+            "train_recall": "Train",
+            "recall": "Test",
+        }
+    )
+
+    sns.set_theme(style="whitegrid")
+    plt.figure(figsize=(10, 6))
+    ax = sns.barplot(
+        data=recall_plot_data,
+        x="score",
+        y="model",
+        hue="split",
+        orient="h",
+    )
+    annotate_horizontal_bars(ax, fmt="%.3f")
+    plt.title("Tuned Models: Train vs Test Recall")
+    plt.xlabel("Recall")
+    plt.ylabel("Model")
+    plt.tight_layout()
+    plt.savefig(FIGURES_DIR / "tuned_train_vs_test_recall.png", dpi=200)
+    plt.close()
+
+    for model_name, result in tuning_results.items():
+        primary_param = result.get("primary_complexity_param")
+        primary_label = result.get("primary_complexity_label", primary_param)
+        diagnostics = result.get("complexity_curve", [])
+        if not primary_param or not diagnostics:
+            continue
+
+        diagnostics_frame = pd.DataFrame(diagnostics)
+
+        metric_panels = [
+            ("mean_train_accuracy", "mean_validation_accuracy", "Accuracy"),
+            ("mean_train_recall", "mean_validation_recall", "Recall"),
+        ]
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        for ax, (train_metric, validation_metric, metric_label) in zip(axes, metric_panels):
+            panel = diagnostics_frame.melt(
+                id_vars=["complexity_value_label"],
+                value_vars=[train_metric, validation_metric],
+                var_name="split",
+                value_name="score",
+            )
+            panel["split"] = panel["split"].map(
+                {
+                    train_metric: "Train CV",
+                    validation_metric: "Validation CV",
+                }
+            )
+            sns.lineplot(
+                data=panel,
+                x="complexity_value_label",
+                y="score",
+                hue="split",
+                style="split",
+                markers=True,
+                dashes=False,
+                ax=ax,
+            )
+            ax.set_title(f"{model_name} {metric_label} vs Complexity")
+            ax.set_xlabel(primary_label)
+            ax.set_ylabel(metric_label)
+            ax.tick_params(axis="x", rotation=20)
+
+        handles, labels = axes[0].get_legend_handles_labels()
+        if axes[0].get_legend() is not None:
+            axes[0].get_legend().remove()
+        if axes[1].get_legend() is not None:
+            axes[1].get_legend().remove()
+        fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False)
+        fig.suptitle(f"{model_name} Overfitting Diagnostic", y=0.98)
+        plt.tight_layout(rect=(0, 0.06, 1, 0.95))
+        safe_name = model_name.lower().replace(" ", "_")
+        plt.savefig(FIGURES_DIR / f"tuned_overfitting_{safe_name}.png", dpi=200)
+        plt.close()
+
+
 def build_comparison_table(baseline_metrics: pd.DataFrame, tuned_metrics: pd.DataFrame) -> pd.DataFrame:
     """Combine baseline and tuned metrics into one side-by-side comparison table."""
     # Join the two experiment tracks by model name so the report can compare them directly.

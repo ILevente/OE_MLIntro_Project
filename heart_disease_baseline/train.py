@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import pandas as pd
+from sklearn.base import clone
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, validation_curve
 
 from heart_disease_baseline.config import (
     CV_FOLDS,
@@ -17,8 +18,56 @@ from heart_disease_baseline.models import build_model_registry, build_tuning_reg
 from heart_disease_baseline.reporting import (
     save_comparison_outputs,
     save_experiment_outputs,
+    save_overfitting_outputs,
     save_tuning_results,
 )
+
+
+def build_validation_curve(
+    estimator: object,
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv: StratifiedKFold,
+    primary_param: str,
+    primary_label: str,
+    ordered_values: list[object],
+) -> tuple[str, str, list[dict[str, float | str | int | None]]]:
+    """Build a denser validation curve for one model while keeping other params fixed."""
+    train_accuracy_scores, validation_accuracy_scores = validation_curve(
+        estimator=clone(estimator),
+        X=X_train,
+        y=y_train,
+        param_name=primary_param,
+        param_range=ordered_values,
+        scoring="accuracy",
+        cv=cv,
+        n_jobs=-1,
+    )
+    train_recall_scores, validation_recall_scores = validation_curve(
+        estimator=clone(estimator),
+        X=X_train,
+        y=y_train,
+        param_name=primary_param,
+        param_range=ordered_values,
+        scoring="recall",
+        cv=cv,
+        n_jobs=-1,
+    )
+    rows: list[dict[str, float | str | int | None]] = []
+
+    for index, value in enumerate(ordered_values):
+        rows.append(
+            {
+                "complexity_value": value,
+                "complexity_value_label": str(value),
+                "mean_train_accuracy": float(train_accuracy_scores[index].mean()),
+                "mean_validation_accuracy": float(validation_accuracy_scores[index].mean()),
+                "mean_train_recall": float(train_recall_scores[index].mean()),
+                "mean_validation_recall": float(validation_recall_scores[index].mean()),
+            }
+        )
+
+    return primary_param, primary_label, rows
 
 
 def select_best_model(metrics: pd.DataFrame) -> pd.DataFrame:
@@ -120,6 +169,9 @@ def run_tuned_experiment(
     for model_name, search_config in build_tuning_registry().items():
         estimator = search_config["estimator"]
         param_grid = search_config["param_grid"]
+        primary_param = search_config["primary_complexity_param"]
+        primary_label = search_config["primary_complexity_label"]
+        curve_values = search_config["validation_curve_values"]
         # Evaluate each hyperparameter combination across the same stratified folds.
         search = GridSearchCV(
             estimator=estimator,
@@ -134,16 +186,32 @@ def run_tuned_experiment(
             refit=TUNING_REFIT_METRIC,
             cv=cv,
             n_jobs=-1,
+            return_train_score=True,
         )
         search.fit(X_train, y_train)
 
         # After CV finishes, sklearn refits the winning configuration on the full training split.
         best_model = search.best_estimator_
+        train_predictions = best_model.predict(X_train)
         predictions = best_model.predict(X_test)
         metrics_row, matrix = evaluate_predictions(model_name, y_test, predictions)
+        train_metrics, _ = evaluate_predictions(model_name, y_train, train_predictions)
+        primary_param, primary_label, complexity_curve = build_validation_curve(
+            best_model,
+            X_train,
+            y_train,
+            cv,
+            primary_param,
+            primary_label,
+            curve_values,
+        )
         # Keep both the final test metrics and the best cross-validation scores for reporting.
         metrics_row.update(
             {
+                "train_accuracy": float(train_metrics["accuracy"]),
+                "train_recall": float(train_metrics["recall"]),
+                "accuracy_gap": float(train_metrics["accuracy"] - metrics_row["accuracy"]),
+                "recall_gap": float(train_metrics["recall"] - metrics_row["recall"]),
                 "cv_accuracy": float(search.cv_results_["mean_test_accuracy"][search.best_index_]),
                 "cv_precision": float(search.cv_results_["mean_test_precision"][search.best_index_]),
                 "cv_recall": float(search.cv_results_["mean_test_recall"][search.best_index_]),
@@ -162,6 +230,9 @@ def run_tuned_experiment(
                 "recall": float(search.cv_results_["mean_test_recall"][search.best_index_]),
                 "f1": float(search.cv_results_["mean_test_f1"][search.best_index_]),
             },
+            "primary_complexity_param": primary_param,
+            "primary_complexity_label": primary_label,
+            "complexity_curve": complexity_curve,
         }
 
     metrics = select_best_model(pd.DataFrame(metrics_rows))
@@ -177,6 +248,7 @@ def run_tuned_experiment(
     )
     # Store the chosen hyperparameters and fold-averaged scores separately from the final test metrics.
     save_tuning_results(tuning_results)
+    save_overfitting_outputs(metrics, tuning_results)
 
     return metrics
 
